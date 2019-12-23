@@ -28,8 +28,10 @@ warn 'Big PR, try to keep changes smaller if you can 😜' if git.lines_of_code 
 # end
 
 # SWIFTLINT
-swiftlint.lint_all_files = true
-swiftlint.lint_files fail_on_error: true
+swiftlint.config_file = '.swiftlint.yml'
+swiftlint.max_num_violations = 20
+swiftlint.lint_files
+swiftlint.directory = 'Sources'
 
 # TEST EVOLUTION CHECK:
 if has_code_changes

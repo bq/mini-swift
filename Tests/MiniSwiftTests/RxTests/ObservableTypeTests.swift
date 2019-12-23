@@ -61,11 +61,12 @@ final class ObservableTypeTests: XCTestCase {
 
     func test_dispatch_action_from_store() throws {
         let dispatcher = Dispatcher()
+        var cancelableBag = CancelableBag()
         let store = Store<TestState, TestStoreController>(TestState(), dispatcher: dispatcher, storeController: TestStoreController(dispatcher: dispatcher))
 
         store
             .reducerGroup
-            .disposed(by: disposeBag)
+            .cancelled(by: &cancelableBag)
 
         guard let state = try Observable<Store<TestState, TestStoreController>>
             .dispatch(using: dispatcher,
@@ -84,11 +85,12 @@ final class ObservableTypeTests: XCTestCase {
 
     func test_dispatch_hashable_action_from_store() throws {
         let dispatcher = Dispatcher()
+        var cancelableBag = CancelableBag()
         let store = Store<TestState, TestStoreController>(TestState(), dispatcher: dispatcher, storeController: TestStoreController(dispatcher: dispatcher))
 
         store
             .reducerGroup
-            .disposed(by: disposeBag)
+            .cancelled(by: &cancelableBag)
 
         guard let state = try Observable<Store<TestState, TestStoreController>>
             .dispatch(using: dispatcher,

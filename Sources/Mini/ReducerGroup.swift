@@ -17,19 +17,27 @@
 import Foundation
 import RxSwift
 
-public protocol Group: Disposable {
-    var disposeBag: CompositeDisposable { get }
+public typealias CancelableBag = [Cancelable]
+
+public protocol Group: Cancelable {
+    var cancelableBag: [Cancelable] { get }
 }
 
 public class ReducerGroup: Group {
-    public let disposeBag = CompositeDisposable()
+    public var cancelableBag: [Cancelable] = []
 
-    public init(_ builder: Disposable...) {
-        let disposable = builder
-        disposable.forEach { _ = disposeBag.insert($0) }
+    public init(_ builder: Cancelable...) {
+        let cancelable = builder
+        cancelable.forEach { cancelableBag.append($0) }
     }
 
-    public func dispose() {
-        disposeBag.dispose()
+    public func cancel() {
+        cancelableBag.forEach { $0.cancel() }
+    }
+}
+
+public extension Cancelable {
+    func cancelled(by bag: inout CancelableBag) {
+        bag.append(self)
     }
 }

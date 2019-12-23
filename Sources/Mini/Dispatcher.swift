@@ -14,11 +14,11 @@
  limitations under the License.
  */
 
+import Dispatch
 import Foundation
 import NIOConcurrencyHelpers
-import RxSwift
 
-public typealias SubscriptionMap = SharedDictionary<String, OrderedSet<DispatcherSubscription>?>
+public typealias SubscriptionMap = SharedDictionary<String, OrderedSet<WorkItem>?>
 
 public final class Dispatcher {
     public struct DispatchMode {
@@ -45,7 +45,8 @@ public final class Dispatcher {
     private let root: RootChain
     private var chain: Chain
     private var dispatching: Bool = false
-    private var subscriptionCounter: Atomic<Int> = Atomic<Int>(value: 0)
+    private var subscriptionCounter = NIOAtomic<Int>.makeAtomic(value: 1)
+    private var workItems: [(Action) -> DispatchWorkItem] = []
 
     public init() {
         root = RootChain(map: subscriptionMap)
@@ -90,31 +91,28 @@ public final class Dispatcher {
         }
     }
 
-    public func subscribe(priority: Int, tag: String, completion: @escaping (Action) -> Void) -> DispatcherSubscription {
-        let subscription = DispatcherSubscription(
-            dispatcher: self,
-            id: getNewSubscriptionId(),
-            priority: priority,
-            tag: tag,
-            completion: completion
-        )
-        return registerInternal(subscription: subscription)
+    public func subscribe(priority _: Int, tag: String, completion: @escaping (Action) -> Void) -> WorkItem {
+        let work: WorkItem = WorkItem(dispatcher: self,
+                                      completion: completion,
+                                      tag: tag,
+                                      id: getNewSubscriptionId())
+        return registerInternal(work: work)
     }
 
-    public func registerInternal(subscription: DispatcherSubscription) -> DispatcherSubscription {
+    private func registerInternal(work: WorkItem) -> WorkItem {
         internalQueue.sync {
-            if let map = subscriptionMap[subscription.tag, orPut: OrderedSet<DispatcherSubscription>()] {
-                map.insert(subscription)
+            if let map = subscriptionMap[work.tag, orPut: OrderedSet<WorkItem>()] {
+                map.insert(work)
             }
         }
-        return subscription
+        return work
     }
 
-    public func unregisterInternal(subscription: DispatcherSubscription) {
+    fileprivate func unregisterInternal(work: WorkItem) {
         internalQueue.sync {
             var removed = false
-            if let set = subscriptionMap[subscription.tag] as? OrderedSet<DispatcherSubscription> {
-                removed = set.remove(subscription)
+            if let set = subscriptionMap[work.tag] as? OrderedSet<WorkItem> {
+                removed = set.remove(work)
             } else {
                 removed = true
             }
@@ -122,13 +120,13 @@ public final class Dispatcher {
         }
     }
 
-    public func subscribe<T: Action>(completion: @escaping (T) -> Void) -> DispatcherSubscription {
+    public func subscribe<T: Action>(completion: @escaping (T) -> Void) -> WorkItem {
         return subscribe(tag: T.tag, completion: { (action: T) -> Void in
             completion(action)
         })
     }
 
-    public func subscribe<T: Action>(tag: String, completion: @escaping (T) -> Void) -> DispatcherSubscription {
+    public func subscribe<T: Action>(tag: String, completion: @escaping (T) -> Void) -> WorkItem {
         return subscribe(tag: tag, completion: { object in
             if let action = object as? T {
                 completion(action)
@@ -138,7 +136,7 @@ public final class Dispatcher {
         })
     }
 
-    public func subscribe(tag: String, completion: @escaping (Action) -> Void) -> DispatcherSubscription {
+    public func subscribe(tag: String, completion: @escaping (Action) -> Void) -> WorkItem {
         return subscribe(priority: Dispatcher.defaultPriority, tag: tag, completion: completion)
     }
 
@@ -182,51 +180,51 @@ public final class Dispatcher {
     }
 }
 
-public final class DispatcherSubscription: Comparable, Disposable {
-    private let dispatcher: Dispatcher
-    public let id: Int
-    private let priority: Int
-    private let completion: (Action) -> Void
+public protocol Cancelable {
+    func cancel()
+}
 
-    public let tag: String
+public final class WorkItem: Comparable, Hashable, Cancelable {
+    private let dispatcher: Dispatcher
+    private let completion: (Action) -> Void
+    private var workItem: ((Action) -> DispatchWorkItem)?
+    fileprivate let tag: String
+    private let id: Int
 
     public init(dispatcher: Dispatcher,
-                id: Int,
-                priority: Int,
+                completion: @escaping (Action) -> Void,
                 tag: String,
-                completion: @escaping (Action) -> Void) {
+                id: Int) {
         self.dispatcher = dispatcher
-        self.id = id
-        self.priority = priority
-        self.tag = tag
         self.completion = completion
+        self.tag = tag
+        self.id = id
+        workItem = { action in
+            DispatchWorkItem {
+                completion(action)
+            }
+        }
     }
 
-    public func dispose() {
-        dispatcher.unregisterInternal(subscription: self)
+    public func cancel() {
+        dispatcher.unregisterInternal(work: self)
     }
 
     public func on(_ action: Action) {
-        completion(action)
+        guard let workItem = self.workItem?(action), let queue = OperationQueue.current?.underlyingQueue else { return }
+        queue.async(execute: workItem)
     }
 
-    public static func == (lhs: DispatcherSubscription, rhs: DispatcherSubscription) -> Bool {
-        return lhs.id == rhs.id
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(tag)
+        hasher.combine(id)
     }
 
-    public static func > (lhs: DispatcherSubscription, rhs: DispatcherSubscription) -> Bool {
-        return lhs.priority > rhs.priority
+    public static func == (lhs: WorkItem, rhs: WorkItem) -> Bool {
+        lhs.hashValue == rhs.hashValue
     }
 
-    public static func < (lhs: DispatcherSubscription, rhs: DispatcherSubscription) -> Bool {
-        return lhs.priority < rhs.priority
-    }
-
-    public static func >= (lhs: DispatcherSubscription, rhs: DispatcherSubscription) -> Bool {
-        return lhs.priority >= rhs.priority
-    }
-
-    public static func <= (lhs: DispatcherSubscription, rhs: DispatcherSubscription) -> Bool {
-        return lhs.priority <= rhs.priority
+    public static func < (lhs: WorkItem, rhs: WorkItem) -> Bool {
+        lhs.hashValue < rhs.hashValue
     }
 }

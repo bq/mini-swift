@@ -1,4 +1,5 @@
 @testable import Mini
+import Nimble
 import RxSwift
 @testable import TestMiddleware
 import XCTest
@@ -6,20 +7,18 @@ import XCTest
 final class DispatcherTests: XCTestCase {
     func test_subscription_count() {
         let dispatcher = Dispatcher()
-        let disposable = CompositeDisposable()
+        var disposable = CancelableBag()
 
         XCTAssert(dispatcher.subscriptionCount == 0)
 
-        _ = disposable.insert(dispatcher.subscribe { (_: SetCounterActionLoaded) -> Void in })
-        _ = disposable.insert(dispatcher.subscribe { (_: SetCounterActionLoaded) -> Void in })
+        disposable.append(dispatcher.subscribe { (_: SetCounterActionLoaded) -> Void in })
+        disposable.append(dispatcher.subscribe { (_: SetCounterActionLoaded) -> Void in })
 
-        print(dispatcher.subscriptionCount)
+        expect(dispatcher.subscriptionCount).toEventually(equal(2))
 
-        XCTAssert(dispatcher.subscriptionCount == 2)
+        disposable.forEach { $0.cancel() }
 
-        disposable.dispose()
-
-        XCTAssert(dispatcher.subscriptionCount == 0)
+        expect(dispatcher.subscriptionCount).toEventually(equal(0))
     }
 
     func test_add_remove_middleware() {

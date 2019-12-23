@@ -5,12 +5,13 @@ import XCTest
 
 final class ReducerTests: XCTestCase {
     func test_dispatcher_triggers_action_in_reducer_group_reducer() {
+        var cancelableBag = CancelableBag()
         let dBag = DisposeBag()
         let dispatcher = Dispatcher()
         let store = Store<TestState, TestStoreController>(TestState(), dispatcher: dispatcher, storeController: TestStoreController(dispatcher: dispatcher))
         store
             .reducerGroup
-            .disposed(by: dBag)
+            .cancelled(by: &cancelableBag)
         XCTAssertTrue(store.state.counter.isIdle)
         var counter: Int = 0
         store
@@ -40,6 +41,7 @@ final class ReducerTests: XCTestCase {
 
     func test_subscribe_to_store_receive_actions() {
         let dBag = DisposeBag()
+        var cancelableBag = CancelableBag()
         let dispatcher = Dispatcher()
         let store = Store<TestState, TestStoreController>(TestState(), dispatcher: dispatcher, storeController: TestStoreController(dispatcher: dispatcher))
         XCTAssertTrue(store.state.counter.isIdle)
@@ -53,7 +55,7 @@ final class ReducerTests: XCTestCase {
             .disposed(by: dBag)
         store
             .reducerGroup
-            .disposed(by: dBag)
+            .cancelled(by: &cancelableBag)
         dispatcher.dispatch(
             SetCounterAction(counter: 2),
             mode: .sync
@@ -63,6 +65,7 @@ final class ReducerTests: XCTestCase {
 
     func test_subscribe_to_store_receive_multiple_actions() {
         let dBag = DisposeBag()
+        var cancelableBag = CancelableBag()
         let dispatcher = Dispatcher()
         let store = Store<TestState, TestStoreController>(TestState(), dispatcher: dispatcher, storeController: TestStoreController(dispatcher: dispatcher))
         XCTAssertTrue(store.state.counter.isIdle)
@@ -76,7 +79,7 @@ final class ReducerTests: XCTestCase {
             .disposed(by: dBag)
         store
             .reducerGroup
-            .disposed(by: dBag)
+            .cancelled(by: &cancelableBag)
         dispatcher.dispatch(
             SetCounterAction(counter: 2),
             mode: .sync
@@ -91,6 +94,7 @@ final class ReducerTests: XCTestCase {
 
     func test_reset_state() {
         let dBag = DisposeBag()
+        var cancelableBag = CancelableBag()
         let dispatcher = Dispatcher()
         let initialState = TestState()
         let store = Store<TestState, TestStoreController>(initialState, dispatcher: dispatcher, storeController: TestStoreController(dispatcher: dispatcher))
@@ -105,7 +109,7 @@ final class ReducerTests: XCTestCase {
             .disposed(by: dBag)
         store
             .reducerGroup
-            .disposed(by: dBag)
+            .cancelled(by: &cancelableBag)
         dispatcher.dispatch(
             SetCounterAction(counter: 3),
             mode: .sync
@@ -117,6 +121,7 @@ final class ReducerTests: XCTestCase {
 
     func test_state_received_in_store() throws {
         let dBag = DisposeBag()
+        var cancelableBag = CancelableBag()
         let dispatcher = Dispatcher()
         let initialState = TestState()
         let store = Store<TestState, TestStoreController>(initialState, dispatcher: dispatcher, storeController: TestStoreController(dispatcher: dispatcher))
@@ -131,7 +136,7 @@ final class ReducerTests: XCTestCase {
             .disposed(by: dBag)
         store
             .reducerGroup
-            .disposed(by: dBag)
+            .cancelled(by: &cancelableBag)
         dispatcher.dispatch(
             SetCounterAction(counter: 3),
             mode: .sync

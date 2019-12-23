@@ -28,7 +28,7 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/ReactiveX/RxSwift.git", from: "5.0.0"),
-        .package(url: "https://github.com/apple/swift-nio.git", .exact("2.7.1")),
+        .package(url: "https://github.com/apple/swift-nio.git", .upToNextMajor(from: "2.7.1")),
         // Development
         .package(url: "https://github.com/Quick/Nimble.git", .exact("8.0.2")), // dev
         .package(url: "https://github.com/minuscorp/ModuleInterface", from: "0.0.1"), // dev
@@ -46,7 +46,7 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
             name: "Mini",
-            dependencies: ["RxSwift", "NIOConcurrencyHelpers"]
+            dependencies: ["RxSwift", "NIOConcurrencyHelpers", "NIO"]
         ),
         .target(
             name: "LoggingService",
@@ -81,9 +81,10 @@ let package = Package(
             "pre-push": "swift test",
             "pre-commit": [
                 "swift test",
+                "swift run swiftlint autocorrect --path Sources/",
+                "swift run swiftlint autocorrect --path Tests/",
                 "swift test --generate-linuxmain",
                 "swift run swiftformat .",
-                "swift run swiftlint autocorrect --path Sources/",
                 "git add .",
             ],
         ],

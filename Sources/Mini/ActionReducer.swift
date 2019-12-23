@@ -14,14 +14,14 @@
  limitations under the License.
  */
 
+import Dispatch
 import Foundation
-import RxSwift
 
 /**
  The `Reducer` defines the behavior to be executed when a certain
  `Action` object is received.
  */
-public class Reducer<A: Action>: Disposable {
+public class Reducer<A: Action>: Cancelable {
     /// The `Action` type which the `Reducer` listens to.
     public let action: A.Type
     /// The `Dispatcher` object that sends the `Action` objects.
@@ -29,7 +29,7 @@ public class Reducer<A: Action>: Disposable {
     /// The behavior to be executed when the `Dispatcher` sends a certain `Action`
     public let reducer: (A) -> Void
 
-    private var disposable: Disposable!
+    private var work: WorkItem?
 
     /**
      Initializes a new `Reducer` object.
@@ -42,18 +42,16 @@ public class Reducer<A: Action>: Disposable {
         self.action = action
         self.dispatcher = dispatcher
         self.reducer = reducer
-        disposable = build()
+        work = build()
     }
 
-    private func build() -> Disposable {
-        let disposable = dispatcher.subscribe(tag: action.tag) {
+    private func build() -> WorkItem {
+        dispatcher.subscribe(tag: action.tag) {
             self.reducer($0)
         }
-        return disposable
     }
 
-    /// Dispose resource.
-    public func dispose() {
-        disposable.dispose()
+    public func cancel() {
+        work?.cancel()
     }
 }
