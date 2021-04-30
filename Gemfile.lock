@@ -199,7 +199,7 @@ GEM
     iniparse (1.4.4)
     json (2.3.0)
     jwt (2.1.0)
-    kramdown (2.3.0)
+    kramdown (2.3.1)
       rexml
     kramdown-parser-gfm (1.1.0)
       kramdown (~> 2.0)
