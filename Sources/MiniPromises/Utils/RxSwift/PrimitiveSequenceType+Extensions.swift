@@ -14,6 +14,8 @@
 // limitations under the License.
 // */
 
+//MARK: - TODO: Translate to Combine if needed
+/*
 import Foundation
 import RxSwift
 
@@ -123,4 +125,4 @@ public extension PrimitiveSequenceType where Trait == CompletableTrait, Element 
             return Disposables.create([subscription])
         }
     }
-}
+}*/

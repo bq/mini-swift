@@ -1,43 +1,12 @@
-/*
- Copyright [2019] [BQ]
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
- */
-
 import Foundation
-import NIOConcurrencyHelpers
-import RxSwift
+import Combine
 
+@available(iOS 13.0, *)
 public typealias SubscriptionMap = SharedDictionary<String, OrderedSet<DispatcherSubscription>?>
 
+@available(iOS 13.0, *)
 public final class Dispatcher {
-    public struct DispatchMode {
-        // swiftlint:disable:next type_name nesting
-        public enum UI {
-            case sync, async
-        }
-    }
-
-    public var subscriptionCount: Int {
-        return subscriptionMap.innerDictionary.mapValues { set -> Int in
-            guard let setValue = set else { return 0 }
-            return setValue.count
-        }
-        .reduce(0) { $0 + $1.value }
-    }
-
-    public static let defaultPriority = 100
-
+    
     private let internalQueue = DispatchQueue(label: "MiniSwift", qos: .userInitiated)
     private var subscriptionMap = SubscriptionMap()
     private var middleware = [Middleware]()
@@ -45,13 +14,29 @@ public final class Dispatcher {
     private let root: RootChain
     private var chain: Chain
     private var dispatching: Bool = false
-    private var subscriptionCounter: Atomic<Int> = Atomic<Int>(value: 0)
-
+    public static let defaultPriority = 100
+    private var subscriptionCounter: Int = 0
+    
+    public struct DispatchMode {
+        // swiftlint:disable:next type_name nesting
+        public enum UI {
+            case sync, async
+        }
+    }
+    
     public init() {
         root = RootChain(map: subscriptionMap)
         chain = root
     }
-
+    
+    public var subscriptionCount: Int {
+        return subscriptionMap.innerDictionary.mapValues { set -> Int in
+            guard let setValue = set else { return 0 }
+            return setValue.count
+        }
+        .reduce(0) { $0 + $1.value }
+    }
+    
     private func build() -> Chain {
         return middleware.reduce(root) { (chain: Chain, middleware: Middleware) -> Chain in
             ForwardingChain { action in
@@ -100,6 +85,15 @@ public final class Dispatcher {
         )
         return registerInternal(subscription: subscription)
     }
+    
+    private func getNewSubscriptionId() -> Int {
+        subscriptionCounter += 1
+        return subscriptionCounter
+    }
+    
+    public func subscribe(tag: String, completion: @escaping (Action) -> Void) -> DispatcherSubscription {
+        return subscribe(priority: Dispatcher.defaultPriority, tag: tag, completion: completion)
+    }
 
     public func registerInternal(subscription: DispatcherSubscription) -> DispatcherSubscription {
         internalQueue.sync {
@@ -133,15 +127,29 @@ public final class Dispatcher {
             if let action = object as? T {
                 completion(action)
             } else {
-                fatalError("Casting to \(tag) failed")
+                print("MiniError: Casting to \(tag) failed")
             }
         })
     }
-
-    public func subscribe(tag: String, completion: @escaping (Action) -> Void) -> DispatcherSubscription {
-        return subscribe(priority: Dispatcher.defaultPriority, tag: tag, completion: completion)
+    
+    func dispatch(_ action: Action) {
+        assert(DispatchQueue.isMain)
+        internalQueue.sync {
+            defer { dispatching = false }
+            if dispatching {
+                preconditionFailure("Already dispatching")
+            }
+            dispatching = true
+            _ = chain.proceed(action)
+            internalQueue.async { [weak self] in
+                guard let self = self else { return }
+                self.service.forEach { service in
+                    service.perform(action, self.chain)
+                }
+            }
+        }
     }
-
+    
     public func dispatch(_ action: Action, mode: Dispatcher.DispatchMode.UI) {
         switch mode {
         case .sync:
@@ -158,31 +166,11 @@ public final class Dispatcher {
             }
         }
     }
-
-    private func dispatch(_ action: Action) {
-        assert(DispatchQueue.isMain)
-        internalQueue.sync {
-            defer { dispatching = false }
-            if dispatching {
-                preconditionFailure("Already dispatching")
-            }
-            dispatching = true
-            _ = chain.proceed(action)
-            internalQueue.async { [weak self] in
-                guard let self = self else { return }
-                self.service.forEach {
-                    $0.perform(action, self.chain)
-                }
-            }
-        }
-    }
-
-    private func getNewSubscriptionId() -> Int {
-        return subscriptionCounter.add(1)
-    }
 }
 
-public final class DispatcherSubscription: Comparable, Disposable {
+@available(iOS 13.0, *)
+public final class DispatcherSubscription: Comparable, Cancellable {
+
     private let dispatcher: Dispatcher
     public let id: Int
     private let priority: Int
@@ -202,7 +190,7 @@ public final class DispatcherSubscription: Comparable, Disposable {
         self.completion = completion
     }
 
-    public func dispose() {
+    public func cancel() {
         dispatcher.unregisterInternal(subscription: self)
     }
 
@@ -230,3 +218,4 @@ public final class DispatcherSubscription: Comparable, Disposable {
         return lhs.priority <= rhs.priority
     }
 }
+

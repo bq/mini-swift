@@ -24,11 +24,13 @@ extension Dictionary where Value: PromiseType, Key: Hashable {
     public func hasValue(for key: Dictionary.Key) -> Bool {
         return keys.contains(key)
     }
-
+    
+    //MARK: - TODO: Translate to Combine if needed
+    /*
     func notify<T: StoreType>(to store: T) -> Self {
         store.replayOnce()
         return self
-    }
+    }*/
 
     @discardableResult
     public func resolve(with other: [Key: Value]) -> Self {

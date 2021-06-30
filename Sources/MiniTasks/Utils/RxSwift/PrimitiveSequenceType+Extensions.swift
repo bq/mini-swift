@@ -14,7 +14,9 @@
  limitations under the License.
  */
 
-import RxSwift
+//MARK: - TODO: Translate to Combine if needed
+/*
+<<<<
 
 public extension PrimitiveSequenceType where Self: ObservableConvertibleType, Self.Trait == SingleTrait {
     /**
@@ -154,4 +156,4 @@ public extension PrimitiveSequenceType where Trait == CompletableTrait, Element 
             return Disposables.create([subscription])
         }
     }
-}
+}*/

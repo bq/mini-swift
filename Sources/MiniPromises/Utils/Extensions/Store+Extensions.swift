@@ -16,8 +16,10 @@
 
 import Foundation
 
+//MARK: - TODO: Translate to Combine if needed
+/*
 public extension Promise {
     func notify<T: StoreType>(to store: T) {
         store.replayOnce()
     }
-}
+}*/

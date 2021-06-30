@@ -42,6 +42,7 @@ public final class ForwardingChain: Chain {
     }
 }
 
+@available(iOS 13.0, *)
 public final class RootChain: Chain {
     private let map: SubscriptionMap
 
